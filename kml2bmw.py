@@ -7,6 +7,7 @@ import datetime
 import xml.dom.minidom as minidom
 import sys
 import codecs
+import math
 
 
 sys.stdout = codecs.getwriter("iso-8859-1")(sys.stdout, 'xmlcharrefreplace')
@@ -16,19 +17,38 @@ parser.add_argument("--input", type=str, default="in.kml",
                     help="path to a kml file")
 parser.add_argument("--output", type=str, default="out",
                     help="path to usb device")
+parser.add_argument("--max_wp", type=int, default=10,
+                    help="how many waypoints to store between places")
+parser.add_argument("--name", type=str, default=None,
+                    help="name of the result route")
 args = parser.parse_args()
 
 
+class Place:
+    def __init__(self, name, pos):
+        self.name = name
+        self.pos = pos
+        self.closest_point = -1
+        self.closest_distance = -1
+        self.wp_count = 0
+        self.waypoints = []
+
+    def __str__(self):
+        return '{} at {}, point: {}, count: {}'.format(self.name, self.pos, self.closest_point, self.wp_count)
+
+    def __repr__(self):
+        return str(self)
+
 class Parser:
-    def __init__(self, file):
+    def __init__(self, file, max_wp, file_name):
         self.root_kml = et.parse(file).getroot()
 
-        self.name = os.path.splitext(ntpath.basename(file))[0]
+        self.name = os.path.splitext(ntpath.basename(file))[0] if not file_name else file_name
         self.places = []
         self.points = []
         self.output = et.Element('DeliveryPackage')
+        self.max_wp = max_wp
         self.route_id = 1
-        self.wp_count = 0
 
         self.parse()
 
@@ -38,16 +58,40 @@ class Parser:
 
         # parse places
         for place in self.root_kml.findall('kml:Document/kml:Placemark/[kml:Point]', ns):
-            location = {'name': place.find('kml:name', ns).text,
-                        'pos': place.find('kml:Point/kml:coordinates', ns).text.split(',')}
-
+            location = Place(place.find('kml:name', ns).text,
+                             place.find('kml:Point/kml:coordinates', ns).text.split(','))
             self.places.append(location)
 
         # parse coordinates
         text = self.root_kml.find('*//kml:LineString/kml:coordinates', ns).text
         self.points = [point.split(',') for point in text.split(' ')]
-        
-        #self.points = self.points[:10]
+
+        # calculate nearest positions to the places
+        for index, point in enumerate(self.points):
+            for place in self.places:
+                distance = self.distance(point, place.pos)
+                current = place.closest_distance
+                if current == -1 or distance < current:
+                    place.closest_point = index
+                    place.closest_distance = distance
+
+        # remove excessive waypoints
+        for index, place in enumerate(self.places):
+            if index < len(self.places) - 1:
+                place.wp_count = self.places[index + 1].closest_point - place.closest_point
+
+        for index, place in enumerate(self.places[:-1]):
+            if index == 0:
+                place.waypoints.append(place.pos)
+            step = place.wp_count / self.max_wp
+            if step == 0:
+                step = 1
+            for i in range(place.closest_point, place.closest_point + place.wp_count, step):
+                place.waypoints.append(self.points[i])
+            place.waypoints.append(self.places[index + 1].pos)
+
+    def distance(self, p1, p2):
+        return math.sqrt(pow(float(p1[0]) - float(p2[0]), 2) + pow(float(p1[1]) - float(p2[1]), 2))
 
     def write(self, out_name):
         dir = os.path.join(out_name, 'BMWData', 'Navigation', 'Routes')
@@ -68,7 +112,6 @@ class Parser:
             tar.add(path, arcname=xml_name)
 
         os.remove(path)
-
 
     def write_header(self):
 
@@ -115,20 +158,15 @@ class Parser:
 
         entry_points = et.SubElement(tour, 'EntryPoints')
         et.SubElement(entry_points, 'EntryPoint', {'Route': '1'}).text = '0_0'
-        et.SubElement(entry_points, 'EntryPoint', {'Route': '1'}).text = '0_{}'.format(len(self.points) + len(self.places) - 1)
+        for i, place in enumerate(self.places[:-1]):
+            name = '{}_{}'.format(i, len(place.waypoints) - 1)
+            et.SubElement(entry_points, 'EntryPoint', {'Route': '{}'.format(i + 1)}).text = name
 
-        routes = et.SubElement(tour, 'Routes')
-        route = et.SubElement(routes, 'Route')
-        et.SubElement(route, 'RouteID').text = str(self.route_id)
+        return et.SubElement(tour, 'Routes')
 
-        return route
-
-    def write_place(self, root, place):
-        self.write_waypoint(root, place['pos'], place['name'])
-
-    def write_waypoint(self, root, point, place):
+    def write_waypoint(self, root, point, index, place=None):
         wp = et.SubElement(root, 'WayPoint')
-        et.SubElement(wp, 'Id').text = "0_{}".format(self.wp_count)
+        et.SubElement(wp, 'Id').text = "{}_{}".format(index, self.wp_count)
         
         locations = et.SubElement(wp, 'Locations')
         location = et.SubElement(locations, 'Location')
@@ -152,19 +190,26 @@ class Parser:
         self.wp_count += 1
 
     def run(self):
-        route = self.write_header()
+        routes = self.write_header()
+        for i, place in enumerate(self.places[:-1]):
+            route = et.SubElement(routes, 'Route')
+            et.SubElement(route, 'RouteID').text = str(self.route_id)
 
-        self.write_place(route, self.places[0])
+            self.wp_count = 0  # reset counter for this route
+            for wp_index, wp in enumerate(place.waypoints):
+                if wp_index == len(place.waypoints) - 1:
+                    # write next waypoint with location
+                    self.write_waypoint(route, wp, i, self.places[i + 1].name)
+                elif i == 0 and wp_index == 0:
+                    # write waypoint with location
+                    self.write_waypoint(route, wp, i, place.name)
+                else:
+                    self.write_waypoint(route, wp, i)
 
-        for point in self.points:
-            self.write_waypoint(route, point, None)
-
-        self.write_place(route, self.places[1])
-
-        et.SubElement(route, 'Length', {'Unit': 'km'}).text = '0'
-        et.SubElement(route, 'Duration', {'Unit': 'h'}).text = '0'
-        et.SubElement(route, 'CostModel').text = '0'
-        et.SubElement(route, 'Criteria').text = '0'
+            et.SubElement(route, 'Length', {'Unit': 'km'}).text = '0'
+            et.SubElement(route, 'Duration', {'Unit': 'h'}).text = '0'
+            et.SubElement(route, 'CostModel').text = '0'
+            et.SubElement(route, 'Criteria').text = '0'
                
         return self
 
@@ -172,4 +217,4 @@ class Parser:
 if not os.path.exists(args.input):
     raise Exception("File '{}' doesn't exist".format(args.input))
 
-Parser(args.input).run().write(args.output)
+Parser(args.input, args.max_wp, args.name).run().write(args.output)
