@@ -76,7 +76,7 @@ class Route:
             self.places.append(location)
 
         # parse coordinates
-        text = root_kml.find('*//kml:LineString/kml:coordinates', ns).text
+        text = xml.find('*//kml:LineString/kml:coordinates', ns).text
         self.points = [point.split(',') for point in text.split(' ')]
 
         # calculate nearest positions to the places
