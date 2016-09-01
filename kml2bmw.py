@@ -1,28 +1,40 @@
 import argparse
 import os
 import xml.etree.ElementTree as et
-import ntpath
 import tarfile
+import zipfile
 import datetime
 import xml.dom.minidom as minidom
 import sys
 import codecs
 import math
+import StringIO
 
+class InMemoryZip(object):
+    def __init__(self):
+        # Create the in-memory file-like object
+        self.in_memory_zip = StringIO.StringIO()
 
-sys.stdout = codecs.getwriter("iso-8859-1")(sys.stdout, 'xmlcharrefreplace')
+    def append(self, filename_in_zip, file_contents):
+        '''Appends a file with name filename_in_zip and contents of
+        file_contents to the in-memory zip.'''
+        # Get a handle to the in-memory zip in append mode
+        zf = zipfile.ZipFile(self.in_memory_zip, "a", zipfile.ZIP_DEFLATED, False)
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--input", type=str, default="in.kml",
-                    help="path to a kml file")
-parser.add_argument("--output", type=str, default="out",
-                    help="path to usb device")
-parser.add_argument("--max_wp", type=int, default=10,
-                    help="how many waypoints to store between places")
-parser.add_argument("--name", type=str, default=None,
-                    help="name of the result route")
-args = parser.parse_args()
+        # Write the file to the in-memory zip
+        zf.writestr(filename_in_zip, file_contents)
 
+        # Mark the files as having been created on Windows so that
+        # Unix permissions are not inferred as 0000
+        for zfile in zf.filelist:
+            zfile.create_system = 0
+
+        return self
+
+    def read(self):
+        '''Returns a string with the contents of the in-memory zip.'''
+        self.in_memory_zip.seek(0)
+        return self.in_memory_zip.read()
 
 class Place:
     def __init__(self, name, pos):
@@ -39,31 +51,32 @@ class Place:
     def __repr__(self):
         return str(self)
 
-class Parser:
-    def __init__(self, file, max_wp, file_name):
-        self.root_kml = et.parse(file).getroot()
-
-        self.name = os.path.splitext(ntpath.basename(file))[0] if not file_name else file_name
+class Route:
+    def __init__(self, xml, max_wp, name, index):
         self.places = []
         self.points = []
         self.output = et.Element('DeliveryPackage')
         self.max_wp = max_wp
-        self.route_id = 1
+        self.name = name
+        self.route_id = index
 
-        self.parse()
+        self.parse(xml)
 
-    def parse(self):
+    def parse(self, xml):
 
         ns = {'kml': 'http://www.opengis.net/kml/2.2'}
 
         # parse places
-        for place in self.root_kml.findall('kml:Document/kml:Placemark/[kml:Point]', ns):
+
+        xmlstr = et.tostring(xml, encoding='utf8', method='xml')
+
+        for place in xml.findall('kml:Placemark/[kml:Point]', ns):
             location = Place(place.find('kml:name', ns).text,
                              place.find('kml:Point/kml:coordinates', ns).text.split(','))
             self.places.append(location)
 
         # parse coordinates
-        text = self.root_kml.find('*//kml:LineString/kml:coordinates', ns).text
+        text = root_kml.find('*//kml:LineString/kml:coordinates', ns).text
         self.points = [point.split(',') for point in text.split(' ')]
 
         # calculate nearest positions to the places
@@ -92,26 +105,6 @@ class Parser:
 
     def distance(self, p1, p2):
         return math.sqrt(pow(float(p1[0]) - float(p2[0]), 2) + pow(float(p1[1]) - float(p2[1]), 2))
-
-    def write(self, out_name):
-        dir = os.path.join(out_name, 'BMWData', 'Navigation', 'Routes')
-        if not os.path.exists(dir):
-            os.makedirs(dir)
-
-        xml_name = "{}.xml".format(self.route_id)
-        path = os.path.join(dir, xml_name)
-        arch_name = os.path.join(dir, "{}.tar.gz".format(self.name))
-
-        rough_string = et.tostring(self.output, 'utf-8')
-        reparsed = minidom.parseString(rough_string)
-
-        pretty = reparsed.toprettyxml(indent="  ")
-        codecs.open(path, 'wb', 'utf-8').write(pretty)
-
-        with tarfile.open(arch_name, "w:gz") as tar:
-            tar.add(path, arcname=xml_name)
-
-        os.remove(path)
 
     def write_header(self):
 
@@ -167,10 +160,10 @@ class Parser:
     def write_waypoint(self, root, point, index, place=None):
         wp = et.SubElement(root, 'WayPoint')
         et.SubElement(wp, 'Id').text = "{}_{}".format(index, self.wp_count)
-        
+
         locations = et.SubElement(wp, 'Locations')
         location = et.SubElement(locations, 'Location')
-        
+
         if place:
             address = et.SubElement(location, 'Address')
             parsed = et.SubElement(address, 'ParsedAddress')
@@ -180,13 +173,13 @@ class Parser:
 
             parsed_place = et.SubElement(parsed, 'ParsedPlace')
             et.SubElement(parsed_place, 'PlaceLevel4').text = place
-            
+
         position = et.SubElement(location, 'GeoPosition')
         et.SubElement(position, 'Latitude').text = point[1]
-        et.SubElement(position, 'Longitude').text = point[0]   
-        
+        et.SubElement(position, 'Longitude').text = point[0]
+
         et.SubElement(wp, 'Importance').text = 'always' if place else 'optional'
-        
+
         self.wp_count += 1
 
     def run(self):
@@ -210,11 +203,72 @@ class Parser:
             et.SubElement(route, 'Duration', {'Unit': 'h'}).text = '0'
             et.SubElement(route, 'CostModel').text = '0'
             et.SubElement(route, 'Criteria').text = '0'
-               
+
         return self
 
+    def write(self):
+        string = StringIO.StringIO(et.tostring(self.output, 'utf-8'))
+        info = tarfile.TarInfo(name="{}.xml".format(self.route_id))
+        info.size = len(string.buf)
 
-if not os.path.exists(args.input):
-    raise Exception("File '{}' doesn't exist".format(args.input))
+        stream = StringIO.StringIO()
+        with tarfile.open(mode="w:gz", fileobj=stream) as tar:
+            tar.addfile(tarinfo=info, fileobj=string)
 
-Parser(args.input, args.max_wp, args.name).run().write(args.output)
+        stream.seek(0)
+        return stream.read()
+
+
+class Parser:
+    def __init__(self, kml, max_wp):
+        self.root_kml = kml
+        self.routes = []
+        self.max_wp = max_wp
+
+    def parse(self):
+        ns = {'kml': 'http://www.opengis.net/kml/2.2'}
+
+        # parse routes
+        i = 0
+        for folder in self.root_kml.findall('kml:Document/kml:Folder', ns):
+            if folder.find('kml:Placemark/kml:LineString', ns) is None:
+                continue
+
+            name = folder.find('kml:name', ns).text
+            i += 1
+            self.routes.append(Route(folder, self.max_wp, name, i))
+
+    def run(self):
+        for r in self.routes:
+            r.run()
+
+    def write(self):
+        zip = InMemoryZip()
+
+        for route in self.routes:
+            name = os.path.join('BMWData', 'Navigation', 'Routes', "{}.tar.gz".format(route.name.encode('utf-8')))
+            zip.append(name, route.write())
+
+        return zip.read()
+
+if __name__ == "__main__":
+    sys.stdout = codecs.getwriter("iso-8859-1")(sys.stdout, 'xmlcharrefreplace')
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--input", type=str, default="in.kml",
+                        help="path to a kml file")
+    parser.add_argument("--output", type=str, default="out",
+                        help="path to usb device")
+    parser.add_argument("--max_wp", type=int, default=10,
+                        help="how many waypoints to store between places")
+    args = parser.parse_args()
+
+    if not os.path.exists(args.input):
+        raise Exception("File '{}' doesn't exist".format(args.input))
+
+    root_kml = et.parse(args.input).getroot()
+
+    parser = Parser(root_kml, args.max_wp)
+    parser.parse()
+    parser.run()
+    open(args.output, 'wb').write(parser.write())
