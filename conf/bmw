@@ -1,0 +1,23 @@
+upstream converter {
+    server localhost:8090;
+}
+
+server {
+    server_name kml2bmw;
+    listen 9090;
+    root /home/android/git/kml2bmw/web;
+    index index.html;
+
+    location / {
+        expires max;
+    }
+
+    location /api/ {
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_redirect off;
+        proxy_pass http://converter;
+        proxy_read_timeout 300000;
+    }    
+}

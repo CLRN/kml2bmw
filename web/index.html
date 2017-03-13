@@ -1,36 +1,33 @@
-<!DOCTYPE html>
-<html>
-<body>
-
-<h2>Google My Maps to BMW routes converter</h2>
-
-<form action="">
-Link to google maps:<br>
-<input type="text" id="input_link" value="">
-<br>
-</form>
-
-<button type="button" onclick="loadDoc()">Convert data</button>
-
-<p id="demo"></p>
-
-<script>
-function loadDoc() {
-  var text = document.getElementById("input_link")
-  var params = {
-    link: text.value
-  };
-
-  var esc = encodeURIComponent;
-  var query = Object.keys(params)
-    .map(k => esc(k) + '=' + esc(params[k]))
-    .join('&');
- 
-  //window.location.href = "/api/route?" + query;
-  window.open("/api/route?" + query);
-}
-</script>
- 
-</body>
-</html>
-
+<!doctype html>
+<title>Google Maps to BMW NBT converter</title>
+<link rel=stylesheet type=text/css href="style.css">
+<div class=page>
+  <h1>Google Maps to BMW NBT converter</h1>
+  <div class=flash>
+    1. Share a map from https://www.google.com/maps/d/ with at least "Anyone who has the link can view" permission
+    <br>
+    2. Copy a link to share
+    <br>
+    3. Paste the link in a field below
+    <br>
+    4. Press "Convert"
+    <br>
+    5. Save archive
+    <br>
+    6. Unpack contents to the root of a USB stick
+    <br>
+    7. Import routes in a car
+  </div>
+  <form action="api/route" method=get class=convert>
+    <dl>
+      <input
+          type=text
+          name=link
+          placeholder="Google maps link"
+          pattern=".*?m?id=\w+.*?"
+          id=link,
+          title="Link to map must be accessible and contain map id. E.g. https://drive.google.com/open?id=1ywXVZ-3ZEAM5lLV9wLOPXl1vzjA&usp=sharing">        
+      <input type=submit value=Convert>
+    </dl>
+  </form>    
+</div>
