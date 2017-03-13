@@ -34,7 +34,6 @@ def convert():
 
        	try:
         	xml = et.fromstring(response.content)
-        	open('out.kml', 'w').write(response.content)
        	except Exception:
        		logging.exception('failed to load map: {}'.format(response.content))
        		return response.content
