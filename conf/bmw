@@ -5,7 +5,7 @@ upstream converter {
 server {
     server_name kml2bmw;
     listen 9090;
-    root /home/android/git/kml2bmw/web;
+    root /opt/kml2bmw/web;
     index index.html;
 
     location / {
