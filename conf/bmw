@@ -4,7 +4,7 @@ upstream converter {
 
 server {
     server_name kml2bmw;
-    listen 9090;
+    listen 80;
     root /opt/kml2bmw/web;
     index index.html;
 

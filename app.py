@@ -48,7 +48,7 @@ def convert():
 
         return r
 
-    except Exception, e:
+    except Exception:
         logging.exception('failed to handle request')
         raise
 

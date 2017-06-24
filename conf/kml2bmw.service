@@ -1,0 +1,9 @@
+[Unit]
+Description=kml to bmw converter
+
+[Service]
+ExecStart=/usr/bin/python /opt/kml2bmw/app.py
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
