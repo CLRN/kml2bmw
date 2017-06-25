@@ -1,44 +1,65 @@
-<!doctype html>
-<title>Google Maps to BMW NBT converter</title>
-<link rel=stylesheet type=text/css href="style.css">
-<div class=page>
-   <h1>Google Maps to BMW NBT converter</h1>
-   <div class=flash>
-      1. Share a map from https://www.google.com/maps/d/ with at least "Anyone who has the link can view" permission
-      <br>
-      2. Copy a link to share
-      <br>
-      3. Paste the link in a field below
-      <br>
-      4. Press "Convert"
-      <br>
-      5. Save archive
-      <br>
-      6. Unpack contents to the root of a USB stick
-      <br>
-      7. Import routes in a car
-   </div>
-   <form action="api/route" method=get class=convert>
-      <dl>
-         <input
-            type=text
-            name=link
-            placeholder="Google maps link"
-            required="required"	
-            pattern=".*?m?id=\w+.*?"
-            id=link,
-            title="Link to map must be accessible and contain map id. E.g. https://drive.google.com/open?id=1ywXVZ-3ZEAM5lLV9wLOPXl1vzjA&usp=sharing">        
-         <input type=submit value=Convert>
-      </dl>
-   </form>
-   <form action="https://www.paypal.com/cgi-bin/webscr" method="post" class=convert>
-      <input type="hidden" name="business" value="clrnmail@gmail.com">
-      <input type="hidden" name="cmd" value="_donations">
-      <input type="hidden" name="item_name" value="BMW maps converter">
-      <input type="hidden" name="currency_code" value="USD">
-      <input type="image" name="submit"
-         src="https://www.paypalobjects.com/webstatic/en_US/i/btn/png/btn_donate_92x26.png"
-         alt="Donate">
-      <img alt="" width="1" height="1" src="https://www.paypalobjects.com/en_US/i/scr/pixel.gif" >
-   </form>
-</div>
+<!DOCTYPE html>
+<html >
+   <head>
+      <meta charset="UTF-8">
+      <title>Clean Contact Form</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/5.0.0/normalize.min.css">
+      <link rel="stylesheet" href="css/style.css">
+   </head>
+   <body>
+      <div class="container">
+         <div class="row header">
+            <h1>Google Maps to BMW NBT converter &nbsp;</h1>
+            <h3>1. Share a map from https://www.google.com/maps/d/ with at least "Anyone who has the link can view" permission</h3>
+            <h3>2. Copy a link to share</h3>
+            <h3>3. Paste the link in a field below</h3>
+            <h3>4. Press "Convert"</h3>
+            <h3>5. Save archive</h3>
+            <h3>6. Unpack contents to the root of a USB stick</h3>
+            <h3>7. Import routes in a car</h3>
+         </div>
+         <div class="row body">
+            <form action="api/route" method=get>
+               <ul>
+                  <li>
+                     <p class="left">
+                        <input
+                           type=text
+                           name=link
+                           placeholder="Google Maps link"
+                           required="required"  
+                           pattern=".*?m?id=\w+.*?"
+                           id=link,
+                           title="Link to map must be accessible and contain map id. E.g. https://drive.google.com/open?id=1ywXVZ-3ZEAM5lLV9wLOPXl1vzjA&usp=sharing">  
+                     </p>
+                  </li>
+                  <li>
+                     <input class="btn btn-submit" type="submit" value="Convert" />
+                     <small>or press <strong>enter</strong></small>
+                  </li>
+               </ul>
+            </form>
+            <form action="https://www.paypal.com/cgi-bin/webscr" method="post" class=convert>
+               <ul>
+                  <li>
+                     <div class="divider"></div>
+                  </li>
+                  <li>
+                     <p class="pull-right">
+                        <input type="hidden" name="business" value="clrnmail@gmail.com">
+                        <input type="hidden" name="cmd" value="_donations">
+                        <input type="hidden" name="item_name" value="BMW maps converter">
+                        <input type="hidden" name="currency_code" value="USD">
+                        <input type="image" name="submit"
+                           src="https://www.paypalobjects.com/webstatic/en_US/i/btn/png/btn_donate_92x26.png"
+                           alt="Donate">
+                        <img alt="" width="1" height="1" src="https://www.paypalobjects.com/en_US/i/scr/pixel.gif" >
+                     </p>
+                  </li>
+               </ul>
+            </form>
+         </div>
+      </div>
+   </body>
+</html>
