@@ -1,5 +1,6 @@
 [Unit]
 Description=kml to bmw converter
+After=network.target
 
 [Service]
 ExecStart=/usr/bin/python /opt/kml2bmw/app.py
