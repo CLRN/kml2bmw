@@ -54,4 +54,4 @@ def convert():
 
 
 if __name__ == '__main__':
-    app.run(threaded=True, port=8090)
+    app.run(port=8090)
